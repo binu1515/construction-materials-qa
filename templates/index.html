@@ -1,0 +1,205 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Material Detection App with Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-3xl font-bold mb-8 text-center">Material Detection App with Chat</h1>
+        
+        <!-- Upload Form -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <form id="uploadForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Upload Video</label>
+                    <input type="file" name="video" accept=".mp4,.avi,.mov" 
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                </div>
+                <button type="submit" 
+                        class="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                    Process Video
+                </button>
+            </form>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="hidden">
+            <div class="flex items-center justify-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            </div>
+            <p class="text-center mt-4">Processing video... This may take a few minutes.</p>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Left Column: Video and Summary -->
+                <div class="space-y-8">
+                    <!-- Video Player -->
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h2 class="text-xl font-semibold mb-4">Processed Video with Detections</h2>
+                        <div class="aspect-w-16 aspect-h-9">
+                            <video id="processedVideo" controls class="w-full rounded-lg">
+                                Your browser does not support the video tag.
+                            </video>
+                        </div>
+                    </div>
+                    
+                    <!-- Detection Summary -->
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h2 class="text-xl font-semibold mb-4">Detection Summary</h2>
+                        <div id="summary" class="space-y-2"></div>
+                    </div>
+                </div>
+                
+                <!-- Right Column: Chat Interface -->
+                <div class="bg-white p-6 rounded-lg shadow-md h-[600px] flex flex-col">
+                    <h2 class="text-xl font-semibold mb-4">Ask Questions About the Video</h2>
+                    
+                    <!-- Chat Messages -->
+                    <div id="chatMessages" class="flex-1 overflow-y-auto mb-4 space-y-4">
+                        <div class="bg-blue-50 p-3 rounded-lg">
+                            <p class="text-sm text-blue-800">
+                                Hello! I can help answer questions about the video content. What would you like to know?
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Chat Input -->
+                    <form id="chatForm" class="flex space-x-2">
+                        <input type="text" id="chatInput" 
+                               class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="Ask a question about the video...">
+                        <button type="submit" 
+                                class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                            Send
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSessionId = null;
+        
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            
+            loading.classList.remove('hidden');
+            results.classList.add('hidden');
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Store session ID
+                    currentSessionId = data.session_id;
+                    
+                    // Set video source
+                    const video = document.getElementById('processedVideo');
+                    console.log("Video path received from backend:", data.video_path);
+
+                    video.src = `${data.video_path}`;
+                    video.load(); //Ensure video player reloads the new video
+                    
+                    // Display summary
+                    const summaryHtml = Object.entries(data.summary)
+                        .map(([object, count]) => `
+                            <div class="flex justify-between items-center py-2 border-b">
+                                <span class="font-medium">${object}</span>
+                                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                    Count: ${count}
+                                </span>
+                            </div>
+                        `).join('');
+                    
+                    document.getElementById('summary').innerHTML = summaryHtml;
+                    
+                    results.classList.remove('hidden');
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                alert('An error occurred while processing the video');
+                console.error(error);
+            } finally {
+                loading.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('chatForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!currentSessionId) {
+                alert('Please upload a video first');
+                return;
+            }
+            
+            const input = document.getElementById('chatInput');
+            const question = input.value.trim();
+            
+            if (!question) return;
+            
+            // Add user message to chat
+            addMessage(question, 'user');
+            input.value = '';
+            
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        question: question,
+                        session_id: currentSessionId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addMessage(data.response, 'assistant');
+                } else {
+                    addMessage('Sorry, there was an error processing your question.', 'assistant');
+                }
+            } catch (error) {
+                addMessage('Sorry, there was an error processing your question.', 'assistant');
+                console.error(error);
+            }
+        });
+
+        function addMessage(text, sender) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const messageElement = document.createElement('div');
+            
+            messageElement.className = sender === 'user' 
+                ? 'bg-blue-50 p-3 rounded-lg ml-8' 
+                : 'bg-gray-50 p-3 rounded-lg mr-8';
+            
+            messageElement.innerHTML = `
+                <p class="text-sm ${sender === 'user' ? 'text-blue-800' : 'text-gray-800'}">
+                    ${text}
+                </p>
+            `;
+            
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+    </script>
+</body>
+</html>
