@@ -1,8 +1,8 @@
-Material Detection App with Chat
+Construction Material Detection App with Chat
 
 Overview
 
-This project is a web-based application for detecting materials in videos using a YOLO-based custom object detection model. The app processes video uploads, performs object detection, and allows users to interact with a Large Language Model (LLM) to ask questions about the detection results. The processed video and detection summary are presented in an intuitive user interface.
+This project is a web-based application for Construction detecting materials in videos using a YOLO-based custom object detection model. The app processes video uploads, performs object detection, and allows users to interact with a Large Language Model (LLM) to ask questions about the detection results. The processed video and detection summary are presented in an intuitive user interface.
 ![Screenshot 2025-01-18 155003](https://github.com/user-attachments/assets/3d917f39-3c7c-47f9-8a30-a527209f6e3b)
 
 Features
